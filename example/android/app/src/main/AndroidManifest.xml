@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.mahmuttaskiran.cameraview.flutter_camera_view_example">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -13,6 +14,7 @@
     <application
         android:name="io.flutter.app.FlutterApplication"
         android:label="flutter_camera_view_example"
+
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
