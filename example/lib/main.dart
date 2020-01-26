@@ -56,7 +56,7 @@ class CameraViewPage extends StatefulWidget {
 }
 
 class _CameraViewPageState extends State<CameraViewPage> {
-  final controller = CameraController();
+  final controller = AndroidCameraController();
   String path;
   @override
   Widget build(BuildContext context) {

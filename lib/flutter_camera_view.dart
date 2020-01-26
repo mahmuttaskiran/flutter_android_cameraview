@@ -48,7 +48,7 @@ enum VideoQuality {
   VeryLow,
 }
 
-class CameraController {
+class AndroidCameraController {
   static const _channelName = 'android_camera_view_channel';
   final _channel = MethodChannel(_channelName, JSONMethodCodec());
 
@@ -60,7 +60,7 @@ class CameraController {
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
 
-  CameraController({
+  AndroidCameraController({
     this.facing = CameraFacing.front,
     this.onCameraError,
   }) {
@@ -190,7 +190,7 @@ class CameraController {
 }
 
 class CameraView extends StatefulWidget {
-  final CameraController controller;
+  final AndroidCameraController controller;
   CameraView({
     Key key,
     this.controller,
