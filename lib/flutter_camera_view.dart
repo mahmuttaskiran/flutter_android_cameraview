@@ -61,7 +61,7 @@ class AndroidCameraController {
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
   
-  Completer _videoRecordingCompleter;
+  Completer<bool> _videoRecordingCompleter;
 
   AndroidCameraController({
     this.facing = CameraFacing.front,
@@ -99,7 +99,7 @@ class AndroidCameraController {
       isRecording = false;
     }
     if(_videoRecordingCompleter == null) {
-      _videoRecordingCompleter = Completer();
+      _videoRecordingCompleter = Completer<bool>();
     }
     return _videoRecordingCompleter.future;
   }
@@ -173,12 +173,12 @@ class AndroidCameraController {
     } else if (call.method == 'onVideoRecordingEnd') {
       isRecording = false;
       if (_videoRecordingCompleter != null) {
-        _videoRecordingCompleter.complete();
+        _videoRecordingCompleter.complete(true);
         _videoRecordingCompleter = null;
       }
     } else if (call.method == 'onVideoTaken') {
        if (_videoRecordingCompleter != null) {
-        _videoRecordingCompleter.complete();
+        _videoRecordingCompleter.complete(true);
         _videoRecordingCompleter = null;
       }
       isRecording = false;
