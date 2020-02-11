@@ -60,7 +60,7 @@ class AndroidCameraController {
   bool isOpened = false;
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
-  
+
   Completer<bool> _videoRecordingCompleter;
   Function onVideoRecordingEnd;
   Function onVideoTaken;
@@ -101,7 +101,7 @@ class AndroidCameraController {
     if (result == true) {
       isRecording = false;
     }
-    if(_videoRecordingCompleter == null) {
+    if (_videoRecordingCompleter == null) {
       _videoRecordingCompleter = Completer<bool>();
     }
     return _videoRecordingCompleter.future;
@@ -167,6 +167,9 @@ class AndroidCameraController {
       if (onCameraError != null) {
         onCameraError(args['message'], args['stacktrace']);
       }
+      if (_videoRecordingCompleter != null) {
+        _videoRecordingCompleter.complete(false);
+      }
     } else if (call.method == 'onCameraOpened') {
       isOpened = true;
     } else if (call.method == 'onCameraClosed') {
@@ -178,11 +181,11 @@ class AndroidCameraController {
       isRecording = false;
       if (onVideoRecordingEnd != null) onVideoRecordingEnd();
     } else if (call.method == 'onVideoTaken') {
-       if (_videoRecordingCompleter != null) {
+      if (_videoRecordingCompleter != null) {
         _videoRecordingCompleter.complete(true);
         _videoRecordingCompleter = null;
       }
-      if (onVideoTaken!= null) onVideoTaken();
+      if (onVideoTaken != null) onVideoTaken();
       isRecording = false;
     }
     return null;
