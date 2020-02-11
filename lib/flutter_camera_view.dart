@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -59,6 +60,8 @@ class AndroidCameraController {
   bool isOpened = false;
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
+  
+  Completer _videoRecordingCompleter;
 
   AndroidCameraController({
     this.facing = CameraFacing.front,
@@ -95,7 +98,10 @@ class AndroidCameraController {
     if (result == true) {
       isRecording = false;
     }
-    return result;
+    if(_videoRecordingCompleter == null) {
+      _videoRecordingCompleter = Completer();
+    }
+    return _videoRecordingCompleter.future;
   }
 
   Future<bool> startPreview() {
@@ -165,6 +171,16 @@ class AndroidCameraController {
     } else if (call.method == 'onVideoRecordingStart') {
       isRecording = true;
     } else if (call.method == 'onVideoRecordingEnd') {
+      isRecording = false;
+      if (_videoRecordingCompleter != null) {
+        _videoRecordingCompleter.complete();
+        _videoRecordingCompleter = null;
+      }
+    } else if (call.method == 'onVideoTaken') {
+       if (_videoRecordingCompleter != null) {
+        _videoRecordingCompleter.complete();
+        _videoRecordingCompleter = null;
+      }
       isRecording = false;
     }
     return null;
