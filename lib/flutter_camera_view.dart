@@ -62,6 +62,9 @@ class AndroidCameraController {
   double zoom = 0;
   
   Completer<bool> _videoRecordingCompleter;
+  Function onVideoRecordingEnd;
+  Function onVideoTaken;
+  Function onVideoRecordingStart;
 
   AndroidCameraController({
     this.facing = CameraFacing.front,
@@ -170,17 +173,16 @@ class AndroidCameraController {
       isOpened = false;
     } else if (call.method == 'onVideoRecordingStart') {
       isRecording = true;
+      if (onVideoRecordingStart != null) onVideoRecordingStart();
     } else if (call.method == 'onVideoRecordingEnd') {
       isRecording = false;
-      if (_videoRecordingCompleter != null) {
-        _videoRecordingCompleter.complete(true);
-        _videoRecordingCompleter = null;
-      }
+      if (onVideoRecordingEnd != null) onVideoRecordingEnd();
     } else if (call.method == 'onVideoTaken') {
        if (_videoRecordingCompleter != null) {
         _videoRecordingCompleter.complete(true);
         _videoRecordingCompleter = null;
       }
+      if (onVideoTaken!= null) onVideoTaken();
       isRecording = false;
     }
     return null;
