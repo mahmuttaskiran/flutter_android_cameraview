@@ -208,10 +208,16 @@ class AndroidCameraController {
     final strFilter = filter.toString();
     return strFilter.substring(strFilter.indexOf(".") + 1);
   }
+
+  Future dispose() async {
+    await _channel.invokeMethod("dispose");
+    return null;
+  }
 }
 
 class CameraView extends StatefulWidget {
   final AndroidCameraController controller;
+
   CameraView({
     Key key,
     this.controller,
@@ -223,11 +229,10 @@ class CameraView extends StatefulWidget {
   _CameraViewState createState() => _CameraViewState();
 }
 
-class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
+class _CameraViewState extends State<CameraView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
@@ -240,21 +245,5 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
             widget.controller.facing == CameraFacing.back ? 'BACK' : 'FRONT',
       },
     );
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    widget.controller.stopPreview();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      widget.controller.startPreview();
-    } else {
-      widget.controller.stopPreview();
-    }
   }
 }
