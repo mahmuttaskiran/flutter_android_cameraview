@@ -9,5 +9,4 @@ class FlutterCameraViewPlugin {
       registrar.platformViewRegistry().registerViewFactory("android_camera_view",AndroidCameraViewFactory(registrar))
     }
   }
-
 }
