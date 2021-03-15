@@ -1,14 +1,16 @@
-# flutter_camera_view
+# flutter_android_cameraview
 
-A new flutter plugin project.
+A Flutter plugin for Android allowing to the device cameras.
 
-## Getting Started
+Note: This plugin does not support iOS or any platform which Flutter supports. Only intented to use https://github.com/natario1/CameraView on Flutter for Android. I don't intent support iOS. But you are completely free to open pullrequest.
+## Features
+* Video recording
+* Camera effects
+* Snaphot recording (for small video sizes)
+* Instant recording
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+## Usage
+See example directory and source code of library.<br>
+// TODO: add examples and explain how to use.
 
-For help getting started with Flutter, view our 
-[online documentation](https://flutter.dev/docs), which offers tutorials, 
-samples, guidance on mobile development, and a full API reference.
+
