@@ -53,7 +53,7 @@ class AndroidCameraController {
   static const _channelName = 'android_camera_view_channel';
   final _channel = MethodChannel(_channelName, JSONMethodCodec());
 
-  Function(String, String) onCameraError;
+  Function(String, String)? onCameraError;
 
   CameraFacing facing;
   bool isRecording = false;
@@ -61,14 +61,14 @@ class AndroidCameraController {
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
 
-  Completer<bool> _videoRecordingCompleter;
-  Function onVideoRecordingEnd;
-  Function onVideoTaken;
-  Function onVideoRecordingStart;
+  Completer<bool>? _videoRecordingCompleter;
+  Function? onVideoRecordingEnd;
+  Function? onVideoTaken;
+  Function? onVideoRecordingStart;
 
   AndroidCameraController({
     this.facing = CameraFacing.front,
-    this.onCameraError,
+    required this.onCameraError,
   }) {
     _channel.setMethodCallHandler(_methodCallHandler);
   }
@@ -76,12 +76,11 @@ class AndroidCameraController {
   Future<bool> startRecording(
     File file, {
     VideoQuality videoQuality = VideoQuality.FullHd,
-    Duration maxDuration,
+    Duration? maxDuration,
     bool snapshot = false,
-    int snapshotMaxWidth,
-    int snapshotMaxHeight,
+    int? snapshotMaxWidth,
+    int? snapshotMaxHeight,
   }) async {
-    assert(file != null);
     var result = await _channel
         .invokeMethod(snapshot ? 'takeSnapshot' : 'startRecording', {
       'file': file.path,
@@ -104,52 +103,88 @@ class AndroidCameraController {
     if (_videoRecordingCompleter == null) {
       _videoRecordingCompleter = Completer<bool>();
     }
-    return _videoRecordingCompleter.future;
+    return _videoRecordingCompleter!.future;
   }
 
   Future<bool> startPreview() {
-    return _channel.invokeMethod('startPreview');
+    try {
+      final result = _channel.invokeMethod('startPreview');
+      return result as Future<bool>;
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
+    }
+    return Future.value(false);
   }
 
   Future<bool> stopPreview() {
-    return _channel.invokeMethod('stopPreview');
+    try {
+      final result = _channel.invokeMethod('stopPreview');
+      return result as Future<bool>;
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
+    }
+    return Future.value(false);
   }
 
   Future<bool> setFacing(CameraFacing facing) async {
-    final result = await _channel.invokeMethod('setFacing', {
-      'facing': facing == CameraFacing.back ? 'BACK' : 'FRONT',
-    });
-    if (result == true) {
-      this.facing = facing;
+    try {
+      final result = await _channel.invokeMethod('setFacing', {
+        'facing': facing == CameraFacing.back ? 'BACK' : 'FRONT',
+      });
+      if (result == true) {
+        this.facing = facing;
+      }
+      return result;
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
     }
-    return result;
+    return Future.value(false);
   }
 
   Future<bool> setFlash(CameraFlash flash) async {
-    final str = flash.toString();
-    final fstr = str.substring(str.indexOf('.') + 1);
-    final result = await _channel.invokeMethod('setFlash', {
-      'flash': fstr.toUpperCase(),
-    });
-    if (result == true) {
-      this.flash = flash;
+    try {
+      final str = flash.toString();
+      final fstr = str.substring(str.indexOf('.') + 1);
+      final result = await _channel.invokeMethod('setFlash', {
+        'flash': fstr.toUpperCase(),
+      });
+      if (result == true) {
+        this.flash = flash;
+      }
+      return result;
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
     }
-    return result;
+    return Future.value(false);
   }
 
-  Future<void> setZoom(double zoom) {
-    _channel.invokeMethod("setZoom", {
-      'zoom': zoom,
-    });
-    this.zoom = zoom;
-    return null;
+  Future setZoom(double zoom) {
+    try {
+      _channel.invokeMethod("setZoom", {
+        'zoom': zoom,
+      });
+      this.zoom = zoom;
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
+    }
+    return Future.value();
   }
 
   Future<void> setFilters(List<CameraFilter> filters) {
-    _channel.invokeMethod("setFilters", {
-      'filters': filters.map((f) => _filterToString(f)).toList(),
-    });
-    return null;
+    try {
+      _channel.invokeMethod("setFilters", {
+        'filters': filters.map((f) => _filterToString(f)).toList(),
+      });
+    } on PlatformException catch (error, stacktrace) {
+      print(error);
+      print(stacktrace);
+    }
+    return Future.value();
   }
 
   Future<bool> toggleFacing() {
@@ -165,10 +200,10 @@ class AndroidCameraController {
     final args = call.arguments;
     if (call.method == 'onCameraError') {
       if (onCameraError != null) {
-        onCameraError(args['message'], args['stacktrace']);
+        onCameraError!(args['message'], args['stacktrace']);
       }
       if (_videoRecordingCompleter != null) {
-        _videoRecordingCompleter.complete(false);
+        _videoRecordingCompleter!.complete(false);
       }
     } else if (call.method == 'onCameraOpened') {
       isOpened = true;
@@ -176,19 +211,19 @@ class AndroidCameraController {
       isOpened = false;
     } else if (call.method == 'onVideoRecordingStart') {
       isRecording = true;
-      if (onVideoRecordingStart != null) onVideoRecordingStart();
+      if (onVideoRecordingStart != null) onVideoRecordingStart!();
     } else if (call.method == 'onVideoRecordingEnd') {
       isRecording = false;
-      if (onVideoRecordingEnd != null) onVideoRecordingEnd();
+      if (onVideoRecordingEnd != null) onVideoRecordingEnd!();
     } else if (call.method == 'onVideoTaken') {
       if (_videoRecordingCompleter != null) {
-        _videoRecordingCompleter.complete(true);
+        _videoRecordingCompleter!.complete(true);
         _videoRecordingCompleter = null;
       }
-      if (onVideoTaken != null) onVideoTaken();
+      if (onVideoTaken != null) onVideoTaken!();
       isRecording = false;
     }
-    return null;
+    return Future.value();
   }
 
   _getVideoSize(VideoQuality q) {
@@ -219,10 +254,9 @@ class CameraView extends StatefulWidget {
   final AndroidCameraController controller;
 
   CameraView({
-    Key key,
-    this.controller,
-  })  : assert(Platform.isAndroid, 'This plugin olny supports Androd.'),
-        assert(controller != null),
+    Key? key,
+    required this.controller,
+  })   : assert(Platform.isAndroid, 'This plugin olny supports Androd.'),
         super(key: key);
 
   @override

@@ -28,7 +28,7 @@ class _MyAppState extends State<MyApp> {
         ),
         body: Builder(
           builder: (context) {
-            return FlatButton(
+            return TextButton(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -56,8 +56,9 @@ class CameraViewPage extends StatefulWidget {
 }
 
 class _CameraViewPageState extends State<CameraViewPage> {
-  final controller = AndroidCameraController();
-  String path;
+  final controller = AndroidCameraController(onCameraError: (e, st) {});
+  String? path;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,7 +104,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
                 MaterialPageRoute(
                   builder: (context) {
                     return VideoPlayerScreen(
-                      file: File(path),
+                      file: File(path!),
                     );
                   },
                 ),
@@ -131,7 +132,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
               path =
                   '${directory.path}/videofile_${Random().nextInt(100000)}.mp4';
               final isRecording = await controller.startRecording(
-                File(path),
+                File(path!),
                 snapshot: true,
               );
               print("startRecordButton: isRecording: $isRecording");
@@ -161,16 +162,17 @@ class _CameraViewPageState extends State<CameraViewPage> {
 }
 
 class VideoPlayerScreen extends StatefulWidget {
-  final File file;
-  VideoPlayerScreen({this.file, Key key}) : super(key: key);
+  final File? file;
+
+  VideoPlayerScreen({this.file, Key? key}) : super(key: key);
 
   @override
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  VideoPlayerController _controller;
-  Future<void> _initializeVideoPlayerFuture;
+  late VideoPlayerController _controller;
+  Future<void>? _initializeVideoPlayerFuture;
 
   @override
   void initState() {
@@ -178,9 +180,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // offers several different constructors to play videos from assets, files,
     // or the internet.
     print('fileInformation: ${widget.file}');
-    print('fileSize: ${widget.file.lengthSync()}');
+    print('fileSize: ${widget.file!.lengthSync()}');
     _controller = VideoPlayerController.file(
-      widget.file,
+      widget.file!,
     );
     _initializeVideoPlayerFuture = _controller.initialize();
     super.initState();
@@ -199,7 +201,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        if (_controller.value.initialized) {
+        if (_controller.value.isInitialized) {
           _controller.setLooping(true);
           _controller.play();
         }
