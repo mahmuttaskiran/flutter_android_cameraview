@@ -13,8 +13,10 @@
          FlutterApplication and put your custom class here. -->
     <application
         android:label="flutter_camera_view_example"
-
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"

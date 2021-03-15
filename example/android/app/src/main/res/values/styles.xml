@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- You can name this style whatever you'd like -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-    </style>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar"/>
 </resources>
