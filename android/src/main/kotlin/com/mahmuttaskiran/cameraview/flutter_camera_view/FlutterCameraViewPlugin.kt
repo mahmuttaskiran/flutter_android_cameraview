@@ -6,8 +6,7 @@ class FlutterCameraViewPlugin {
   companion object {
     @JvmStatic
     fun registerWith(registrar: Registrar) {
-      registrar.platformViewRegistry().registerViewFactory("android_camera_view",AndroidCameraViewFactory(registrar))
+      registrar.platformViewRegistry().registerViewFactory("flutter_camera_view",AndroidCameraViewFactory(registrar))
     }
   }
-
 }

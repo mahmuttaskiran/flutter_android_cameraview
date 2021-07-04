@@ -8,7 +8,6 @@
 import AVFoundation
 import Flutter
 import UIKit
-import CameraManager
 
 class FlutterCameraView: NSObject, FlutterPlatformView {
     
@@ -26,7 +25,7 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         binaryMessenger messenger: FlutterBinaryMessenger?
     ) {
         cameraView = UIView();
-        cameraManager = CameraManager();
+        cameraManager = CameraManager()
         super.init()
         
         if(args is NSDictionary){
@@ -37,13 +36,21 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         // iOS views can be created here
         cameraManager.focusMode = .autoFocus
         cameraManager.shouldFlipFrontCameraImage = true
+        cameraManager.showErrorsToUsers = true
+//        cameraManager.cameraOutputMode = .videoWithMic
+//        cameraManager.focusMode = .locked
+//        cameraManager.exposureMode = .custom
         
         channel = FlutterMethodChannel(name: "flutter_camera_view_channel", binaryMessenger: messenger!, codec: FlutterJSONMethodCodec.sharedInstance())
         channel!.setMethodCallHandler(handle)
         
-        cameraManager.addPreviewLayerToView(cameraView)
-        if (cameraManager.cameraIsReady) {
-            channel!.invokeMethod("onCameraOpened", arguments: nil)
+        let state = cameraManager.addPreviewLayerToView(cameraView)
+        if (state == CameraState.ready) {
+            onCameraOpened()
+        }
+        
+        cameraManager.showErrorBlock = { (erTitle: String, erMessage: String) -> Void in
+            self.onCameraError(message: erMessage)
         }
     }
 
@@ -58,9 +65,52 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         }
         switch call.method {
         case "setFacing":
+            if (errorIfCameraNotOpened(result: result)) {
+                return
+            }
+            if (errorIfTakingVideo(result: result)) {
+                return
+            }
+            if (errorIfTakingPicture(result: result)) {
+                return
+            }
             let facing: String = dict!.value(forKey: "facing") as! String
-            self.cameraManager.cameraDevice = facing == "FRONT" ? .front : .back
+            cameraManager.cameraDevice = facing == "FRONT" ? .front : .back
             result(true)
+        case "setFlash":
+            if (errorIfCameraNotOpened(result: result)) {
+                return
+            }
+            if (errorIfTakingVideo(result: result)) {
+                return
+            }
+            if (errorIfTakingPicture(result: result)) {
+                return
+            }
+            let flash: String = dict!.value(forKey: "flash") as! String
+            let mode: CameraFlashMode
+            switch flash {
+            case "auto":
+                mode = .auto
+            case "on":
+                mode = .on
+            case "off":
+                mode = .off
+            default:
+                mode = .auto
+            }
+            cameraManager.flashMode = mode
+            result(true)
+        case "setZoom":
+            if (errorIfCameraNotOpened(result: result)) {
+                return
+            }
+            let zoom: CGFloat = dict!.value(forKey: "zoom") as! CGFloat
+            cameraManager.zoom(zoom)
+            result(true)
+        case "dispose":
+            cameraManager.stopAndRemoveCaptureSession()
+            cameraView.removeFromSuperview()
         case "takePicture":
             if (errorIfCameraNotOpened(result: result)) {
                 return
@@ -71,7 +121,6 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
             if (errorIfTakingPicture(result: result)) {
                 return
             }
-            cameraManager.cameraOutputMode = .stillImage
             let file: String = dict!.value(forKey: "file") as! String
             isTakingPicture = true
             cameraManager.capturePictureWithCompletion({ image in
@@ -81,8 +130,13 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                         result(FlutterError.init(code: "TakePictureError", message: "Take picture failure.", details: nil))
                     case .success(let content):
                         let path = self.storeImageDataToFile(data: content.asData!, path: file)
-                        self.isTakingPicture = false
-                        result(path)
+                        if (path != nil) {
+                            self.isTakingPicture = false
+                            result(true)
+                        } else {
+                            result(FlutterError.init(code: "SavePictureError", message: "Save picture failure.", details: nil))
+                        }
+                        
                 }
             })
         case "startRecording":
@@ -95,7 +149,6 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
             if (errorIfTakingPicture(result: result)) {
                 return
             }
-            cameraManager.cameraOutputMode = .videoWithMic
             let file: String = dict!.value(forKey: "file") as! String
             self.fileURL = URL(fileURLWithPath: file)
             self.isTakingVideo = true
@@ -128,6 +181,14 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         default:
             result(nil)
         }
+    }
+    
+    func onCameraOpened() -> Void {
+        channel!.invokeMethod("onCameraOpened", arguments: nil)
+    }
+    
+    func onCameraError(message: String) -> Void {
+        channel!.invokeMethod("onCameraError", arguments: message)
     }
     
     func onVideoRecordingStart() -> Void {

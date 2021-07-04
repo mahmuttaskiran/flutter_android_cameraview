@@ -12,6 +12,9 @@ import com.otaliastudios.cameraview.filter.Filter
 import com.otaliastudios.cameraview.filter.MultiFilter
 import com.otaliastudios.cameraview.filter.NoFilter
 import com.otaliastudios.cameraview.filters.*
+import com.otaliastudios.cameraview.gesture.Gesture
+import com.otaliastudios.cameraview.gesture.GestureAction
+import com.otaliastudios.cameraview.markers.DefaultAutoFocusMarker
 import com.otaliastudios.cameraview.size.SizeSelector
 import com.otaliastudios.cameraview.size.SizeSelectors
 import io.flutter.plugin.common.JSONMethodCodec
@@ -30,11 +33,12 @@ class AndroidCameraView
 internal constructor(private val registrar: Registrar, creationParams: Any) : PlatformView, MethodCallHandler, CameraListener() {
     private var cameraView: CameraView
     private var channel: MethodChannel
+    private var file: File? = null
 
     init {
         Log.i("AndroidCameraView", "init!")
         cameraView = initView(registrar, creationParams as JSONObject)
-        channel = MethodChannel(registrar.messenger(), "android_camera_view_channel", JSONMethodCodec.INSTANCE)
+        channel = MethodChannel(registrar.messenger(), "flutter_camera_view_channel", JSONMethodCodec.INSTANCE)
         channel.setMethodCallHandler(this)
     }
 
@@ -57,9 +61,18 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
         Log.i("AndroidCameraView", "initView: $options")
         val cameraView = CameraView(registrar.context())
         cameraView.facing = Facing.valueOf(options.optString("facing", "FRONT").toUpperCase())
-        cameraView.mode = Mode.VIDEO
+        cameraView.mode = Mode.PICTURE
         cameraView.engine = Engine.CAMERA2
         cameraView.preview = Preview.GL_SURFACE
+        cameraView.audioBitRate = 64000;
+        cameraView.setAutoFocusMarker(DefaultAutoFocusMarker())
+        cameraView.mapGesture(Gesture.PINCH, GestureAction.ZOOM); // Pinch to zoom!
+        cameraView.mapGesture(Gesture.TAP, GestureAction.AUTO_FOCUS); // Tap to focus!
+        cameraView.mapGesture(Gesture.SCROLL_VERTICAL, GestureAction.EXPOSURE_CORRECTION); // scroll_vertical to exposure!
+        // set size
+        var size: SizeSelector = SizeUtils.getSizeSelector(options.optString("resolutionPreset", "1080p"))
+        cameraView.setPictureSize(size)
+        cameraView.setVideoSize(size)
         cameraView.addCameraListener(this)
         cameraView.open()
         return cameraView
@@ -91,9 +104,6 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
         exception.printStackTrace()
         Log.i("AndroidCameraView", "onCameraError:")
         super.onCameraError(exception)
-        val args = JSONObject()
-        args.put("message", exception.message)
-        args.put("stacktrace", exception.stackTrace.toString())
         channel.invokeMethod("onCameraError", exception.message)
     }
 
@@ -152,38 +162,36 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
                 if (errorIfTakingVideo(result)) return
                 if (errorIfTakingPicture(result)) return
                 val fileInStr = jsonArgs.getString("file")
-                val videoSizeInStr = jsonArgs.optString("videoSize", "2160p")
                 val maxDuration = jsonArgs.optInt("maxDuration", DEFAULT_VIDEO_MAX_DURATION)
                 val file = File(fileInStr)
                 if (file.exists()) {
                     result.error("CameraError", "${file.path} already exists.", null)
                     return
                 }
-                cameraView.setVideoSize(SizeUtils.getSizeSelector(videoSizeInStr))
-                cameraView.takeVideo(file, maxDuration)
+                cameraView.takeVideoSnapshot(file, maxDuration)
                 return result.success(true)
             }
-            "takeSnapshot" -> {
+            "takePicture" -> {
                 if (errorIfCameraNotOpened(result)) return
                 if (errorIfTakingVideo(result)) return
                 if (errorIfTakingPicture(result)) return
                 val fileInStr = jsonArgs.getString("file")
-                val maxDuration = jsonArgs.optInt("maxDuration", DEFAULT_VIDEO_MAX_DURATION)
-                val file = File(fileInStr)
-                if (file.exists()) {
-                    result.error("CameraError", "${file.path} already exists.", null)
+                file = File(fileInStr)
+                if (file!!.exists()) {
+                    result.error("CameraError", "${file!!.path} already exists.", null)
                     return
                 }
-                val maxWidth = jsonArgs.optInt("maxWidth", 0)
-                val maxHeight = jsonArgs.optInt("maxHeight", 0)
-                if (maxWidth != 0) {
-                    cameraView.setSnapshotMaxHeight(maxWidth)
-                }
-                if (maxHeight != 0) {
-                    cameraView.setSnapshotMaxHeight(maxHeight)
-                }
-                cameraView.takeVideoSnapshot(file, maxDuration)
-                return result.success(true)
+                cameraView.mode = Mode.PICTURE;
+                cameraView.pictureSnapshotMetering = true
+                cameraView.takePictureSnapshot()
+                cameraView.addCameraListener(object : CameraListener() {
+                    override fun onPictureTaken(picture: PictureResult) {
+                        super.onPictureTaken(picture)
+                        CameraUtils.writeToFile(picture.data, file!!)
+                        result.success(true)
+                        cameraView.removeCameraListener(this)
+                    }
+                })
             }
             "startPreview" -> {
                 if (!cameraView.isOpened) {
@@ -213,7 +221,7 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
                 if (errorIf(facingInStr == null, result, "set facing!")) return
                 val facing: Facing = Facing.valueOf(facingInStr)
                 cameraView.facing = facing
-                cameraView.zoom
+                cameraView.zoom = 0.toFloat()
                 result.success(true)
             }
             "setFlash" -> {
@@ -230,12 +238,6 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
                 if (errorIfCameraNotOpened(result)) return
                 cameraView.zoom = jsonArgs.optDouble("zoom", 0.0).toFloat()
             }
-            "setFilters" -> {
-                if (errorIfCameraNotOpened(result)) return
-                val filter = getFilters(jsonArgs.optJSONArray("filters"))
-                cameraView.setExperimental(true)
-                cameraView.filter = filter
-            }
             "dispose" -> {
                 cameraView.close()
                 cameraView.destroy()
@@ -243,46 +245,6 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
         }
     }
 
-    private fun getFilters(arr: JSONArray?): Filter {
-        if (arr == null || arr.length() == 0) {
-            return NoFilter()
-        }
-        val filters = MultiFilter()
-        for (i: Int in 0 until arr.length()) {
-            val filter = arr.getString(i)
-            if (filter == null || filter.isEmpty()) continue
-            filters.addFilter(getFilter(filter))
-        }
-        return filters
-    }
-
-    private fun getFilter(filter: String): Filter {
-        return when (filter) {
-            "AutoFix" -> AutoFixFilter()
-            "BlackAndWhite" -> BlackAndWhiteFilter()
-            "Brightness" -> BrightnessFilter()
-            "Contrast" -> ContrastFilter()
-            "CrossProcess" -> CrossProcessFilter()
-            "Documentary" -> DocumentaryFilter()
-            "Duotone" -> DuotoneFilter()
-            "FillLight" -> FillLightFilter()
-            "Gamma" -> GammaFilter()
-            "Grain" -> GrainFilter()
-            "GrayScale" -> GrayscaleFilter()
-            "Hue" -> HueFilter()
-            "InvertColors" -> InvertColorsFilter()
-            "Lomoish" -> LomoishFilter()
-            "Posterize" -> PosterizeFilter()
-            "Saturation" -> SaturationFilter()
-            "Sepia" -> SepiaFilter()
-            "Sharpness" -> SharpnessFilter()
-            "Temperature" -> TemperatureFilter()
-            "Tint" -> TintFilter()
-            "Vignette" -> VignetteFilter()
-            "NoFilter" -> NoFilter()
-            else -> NoFilter()
-        }
-    }
 }
 
 class SizeUtils {
@@ -304,7 +266,8 @@ class SizeUtils {
                 "2160p" -> SizeSelectors.or(andMin(3840, 2160), SizeSelectors.biggest())
                 "1080p" -> SizeSelectors.or(andMin(1920, 1080), andMax(3840, 2060))
                 "720p" -> SizeSelectors.or(andMin(1280, 720), andMax(1920, 1080))
-                "480p" -> SizeSelectors.or(andMin(720, 480), andMax(1280, 720))
+                "540p" -> SizeSelectors.or(andMin(960, 540), andMax(1280, 720))
+                "480p" -> SizeSelectors.or(andMin(720, 480), andMax(960, 540))
                 else -> SizeSelectors.biggest()
             }
         }

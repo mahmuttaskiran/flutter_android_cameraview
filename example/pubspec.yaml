@@ -10,6 +10,7 @@ dependencies:
     sdk: flutter
   path_provider: ^2.0.0-nullsafety.1
   video_player: ^2.0.0-nullsafety.10
+  permission_handler: ^8.1.2
   flutter_camera_view:
     path: ../
   cupertino_icons: ^1.0.2

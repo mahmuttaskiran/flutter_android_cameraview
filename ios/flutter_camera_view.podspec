@@ -10,12 +10,15 @@ A new flutter plugin project.
                        DESC
   s.homepage         = 'http://example.com'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
-  s.source           = { :path => '.' }
+  s.author           = { 'lucky1213' => 'lucky1213@' }
+  s.source           = { :path => 'https://github.com/lucky1213/flutter_android_cameraview' }
   s.source_files = 'Classes/**/*'
-  s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
 
-  s.ios.deployment_target = '8.0'
+  s.ios.deployment_target = '9.0'
+
+  # Flutter.framework does not contain a i386 slice.
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'VALID_ARCHS[sdk=iphonesimulator*]' => 'x86_64' }
+  s.swift_version = '5.0'
 end
 
