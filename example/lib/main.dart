@@ -65,12 +65,17 @@ class CameraViewPage extends StatefulWidget {
 }
 
 class _CameraViewPageState extends State<CameraViewPage> {
-  final controller = FlutterCameraController(
+  final FlutterCameraController controller = FlutterCameraController(
     facing: CameraFacing.back,
     resolutionPreset: ResolutionPreset.UHD,
     onCameraError: (e, st) {},
   );
   String? path;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -81,11 +86,27 @@ class _CameraViewPageState extends State<CameraViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         alignment: Alignment.bottomCenter,
         children: <Widget>[
           CameraView(
             controller: controller,
+          ),
+          ValueListenableBuilder(
+            valueListenable: controller.initialized,
+            builder: (context, CameraState value, child) {
+              if (value == CameraState.ready) {
+                return Container();
+              } else if (value == CameraState.preparing) {
+                return Container(
+                  color: Colors.black,
+                );
+              }
+              return Container(
+                color: Colors.blue,
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.all(20.0),

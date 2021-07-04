@@ -60,6 +60,8 @@ extension ExtensionResolutionPreset on ResolutionPreset {
   }
 }
 
+enum CameraState { preparing, ready, error }
+
 class FlutterCameraController {
   static const _channelName = 'flutter_camera_view_channel';
   final _channel = MethodChannel(_channelName, JSONMethodCodec());
@@ -70,7 +72,7 @@ class FlutterCameraController {
   CameraFacing facing;
   bool isTakingPicture = false;
   bool isRecording = false;
-  bool isOpened = false;
+  ValueNotifier<CameraState> initialized = ValueNotifier(CameraState.preparing);
   CameraFlash flash = CameraFlash.off;
   double zoom = 0;
 
@@ -84,12 +86,23 @@ class FlutterCameraController {
     _channel.setMethodCallHandler(_methodCallHandler);
   }
 
+  Future<T?> _invokeMethod<T>(String method, [dynamic arguments]) {
+    try {
+      return _channel.invokeMethod<T>(method, arguments);
+    } catch (error) {
+      if (initialized.value == CameraState.preparing) {
+        initialized.value = CameraState.error;
+      }
+      rethrow;
+    }
+  }
+
   Future<bool> startRecording(
     File file, {
     Duration? maxDuration,
   }) async {
     try {
-      var result = await _channel.invokeMethod('startRecording', {
+      var result = await _invokeMethod('startRecording', {
         'file': file.path,
         'maxDuration': maxDuration?.inMilliseconds,
       });
@@ -97,7 +110,7 @@ class FlutterCameraController {
         isRecording = true;
       }
       return result;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       isRecording = false;
       print(error);
       print(stacktrace);
@@ -108,14 +121,14 @@ class FlutterCameraController {
   Future<bool> takePicture(File file) async {
     isTakingPicture = true;
     try {
-      var result = await _channel.invokeMethod('takePicture', {
+      var result = await _invokeMethod('takePicture', {
         'file': file.path,
       });
       if (result == true) {
         isTakingPicture = false;
       }
       return result;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       isTakingPicture = false;
       print(error);
       print(stacktrace);
@@ -125,7 +138,7 @@ class FlutterCameraController {
 
   Future<bool> stopRecording() async {
     try {
-      final result = await _channel.invokeMethod('stopRecording');
+      final result = await _invokeMethod('stopRecording');
       if (result == true) {
         isRecording = false;
       }
@@ -133,7 +146,7 @@ class FlutterCameraController {
         _videoRecordingCompleter = Completer<bool>();
       }
       return _videoRecordingCompleter!.future;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
@@ -142,9 +155,9 @@ class FlutterCameraController {
 
   Future<bool> startPreview() {
     try {
-      final result = _channel.invokeMethod('startPreview');
+      final result = _invokeMethod('startPreview');
       return result as Future<bool>;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
@@ -153,9 +166,9 @@ class FlutterCameraController {
 
   Future<bool> stopPreview() {
     try {
-      final result = _channel.invokeMethod('stopPreview');
+      final result = _invokeMethod('stopPreview');
       return result as Future<bool>;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
@@ -164,14 +177,14 @@ class FlutterCameraController {
 
   Future<bool> setFacing(CameraFacing facing) async {
     try {
-      final result = await _channel.invokeMethod('setFacing', {
+      final result = await _invokeMethod('setFacing', {
         'facing': facing == CameraFacing.back ? 'BACK' : 'FRONT',
       });
       if (result == true) {
         this.facing = facing;
       }
       return result;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
@@ -182,31 +195,30 @@ class FlutterCameraController {
     try {
       final str = flash.toString();
       final fstr = str.substring(str.indexOf('.') + 1);
-      final result = await _channel.invokeMethod('setFlash', {
+      final result = await _invokeMethod('setFlash', {
         'flash': fstr.toUpperCase(),
       });
       if (result == true) {
         this.flash = flash;
       }
       return result;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
     return Future.value(false);
   }
 
-  Future setZoom(double zoom) {
+  Future<void> setZoom(double zoom) async {
     try {
-      _channel.invokeMethod("setZoom", {
+      await _invokeMethod("setZoom", {
         'zoom': zoom,
       });
       this.zoom = zoom;
-    } on PlatformException catch (error, stacktrace) {
+    } catch (error, stacktrace) {
       print(error);
       print(stacktrace);
     }
-    return Future.value();
   }
 
   Future<bool> toggleFacing() {
@@ -227,10 +239,13 @@ class FlutterCameraController {
       if (_videoRecordingCompleter != null) {
         _videoRecordingCompleter!.complete(false);
       }
+      if (initialized.value == CameraState.preparing) {
+        initialized.value = CameraState.error;
+      }
     } else if (call.method == 'onCameraOpened') {
-      isOpened = true;
+      initialized.value = CameraState.ready;
     } else if (call.method == 'onCameraClosed') {
-      isOpened = false;
+      initialized.value = CameraState.preparing;
     } else if (call.method == 'onVideoRecordingStart') {
       isRecording = true;
     } else if (call.method == 'onVideoRecordingEnd') {
@@ -245,10 +260,7 @@ class FlutterCameraController {
     return Future.value();
   }
 
-  Future dispose() async {
-    await _channel.invokeMethod("dispose");
-    return null;
-  }
+  Future<void> dispose() => _invokeMethod("dispose");
 }
 
 class CameraView extends StatefulWidget {
