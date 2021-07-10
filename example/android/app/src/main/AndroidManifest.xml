@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.mahmuttaskiran.cameraview.flutter_camera_view_example">
+    package="com.lucky1213.flutter_camera_view.flutter_camera_view_example">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -18,7 +18,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.lucky1213.flutter_camera_view.flutter_camera_view_example.MainActivity"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"

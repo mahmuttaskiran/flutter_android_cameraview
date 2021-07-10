@@ -17,6 +17,8 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     private var isTakingVideo: Bool = false
     private var isTakingPicture: Bool = false
     private var channel: FlutterMethodChannel?
+    private var thumbnailPath: String?
+    private var storeThumbnail: Bool = true
 
     init(
         frame: CGRect,
@@ -34,12 +36,9 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
             cameraManager.cameraOutputQuality = getPresetForString(size: dict.value(forKey: "resolutionPreset") as! String)
         }
         // iOS views can be created here
-        cameraManager.focusMode = .autoFocus
         cameraManager.shouldFlipFrontCameraImage = true
         cameraManager.showErrorsToUsers = true
-//        cameraManager.cameraOutputMode = .videoWithMic
-//        cameraManager.focusMode = .locked
-//        cameraManager.exposureMode = .custom
+        cameraManager.flashMode = .off
         
         channel = FlutterMethodChannel(name: "flutter_camera_view_channel", binaryMessenger: messenger!, codec: FlutterJSONMethodCodec.sharedInstance())
         channel!.setMethodCallHandler(handle)
@@ -90,14 +89,14 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
             let flash: String = dict!.value(forKey: "flash") as! String
             let mode: CameraFlashMode
             switch flash {
-            case "auto":
+            case "AUTO":
                 mode = .auto
-            case "on":
+            case "ON":
                 mode = .on
-            case "off":
+            case "OFF":
                 mode = .off
             default:
-                mode = .auto
+                mode = .off
             }
             cameraManager.flashMode = mode
             result(true)
@@ -107,6 +106,14 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
             }
             let zoom: CGFloat = dict!.value(forKey: "zoom") as! CGFloat
             cameraManager.zoom(zoom)
+            result(true)
+        case "stopPreview":
+            if (cameraManager.cameraIsReady) {
+                cameraManager.stopCaptureSession()
+            }
+            result(true)
+        case "startPreview":
+            cameraManager.resumeCaptureSession()
             result(true)
         case "dispose":
             cameraManager.stopAndRemoveCaptureSession()
@@ -128,17 +135,12 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                     case .failure:
                         self.isTakingPicture = false
                         result(FlutterError.init(code: "TakePictureError", message: "Take picture failure.", details: nil))
-                    case .success(let content):
-                        let path = self.storeImageDataToFile(data: content.asData!, path: file)
-                        if (path != nil) {
-                            self.isTakingPicture = false
-                            result(true)
-                        } else {
-                            result(FlutterError.init(code: "SavePictureError", message: "Save picture failure.", details: nil))
-                        }
-                        
+                    case .success:
+                        self.isTakingPicture = false
+                        result(true)
+
                 }
-            })
+            }, URL(fileURLWithPath: file))
         case "startRecording":
             if (errorIfCameraNotOpened(result: result)) {
                 return
@@ -150,9 +152,11 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                 return
             }
             let file: String = dict!.value(forKey: "file") as! String
-            self.fileURL = URL(fileURLWithPath: file)
+            thumbnailPath = dict!.value(forKey: "thumbnailPath") as? String
+            storeThumbnail = dict!.value(forKey: "storeThumbnail") as! Bool
+            fileURL = URL(fileURLWithPath: file)
             self.isTakingVideo = true
-            cameraManager.startRecordingVideo()
+            cameraManager.startRecordingVideo(fileURL!)
             result(true)
             onVideoRecordingStart()
         case "stopRecording":
@@ -166,17 +170,13 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                     result(FlutterError.init(code: "RecordedError", message: recordError?.description ?? "No recorded.", details: nil))
                     return;
                 }
-                do {
-                    self.onVideoRecordingEnd()
-                    try FileManager.default.copyItem(at: videoURL, to: self.fileURL!)
-                    self.isTakingVideo = false
-                    result(true)
-                    self.onVideoTaken()
+                self.onVideoRecordingEnd()
+                self.isTakingVideo = false
+                result(true)
+                if (self.storeThumbnail) {
+                    self.storeThumbnailToFile(url: videoURL)
                 }
-                catch {
-                    self.isTakingVideo = false
-                    result(FlutterError.init(code: "RecordedError", message: recordError?.description ?? "Recorded error.", details: nil))
-                }
+                self.onVideoTaken()
             })
         default:
             result(nil)
@@ -239,6 +239,43 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         do {
             try data.write(to: fileURL)
             return path
+        } catch {
+            return nil
+        }
+    }
+    
+    func storeThumbnailToFile(url: URL) -> Void {
+        // .mp4 -> .jpg
+        let manager = FileManager.default
+        let filename: String = fileURL!.deletingPathExtension().lastPathComponent
+        var thumbURL: URL
+        if (thumbnailPath != nil) {
+            thumbURL = URL(fileURLWithPath: thumbnailPath! + "/", isDirectory: true)
+        } else {
+            thumbURL = fileURL!.deletingLastPathComponent().appendingPathComponent("thumbnail", isDirectory: true)
+        }
+        if (!manager.fileExists(atPath: thumbURL.path)) {
+            try! manager.createDirectory(atPath: thumbURL.path, withIntermediateDirectories: true, attributes: nil)
+        }
+        
+        thumbURL.appendPathComponent(filename + ".jpg")
+        // get thumb UIImage
+        let thumbImage = self.getThumbnailImage(url: url)
+        if (thumbImage != nil) {
+            // store to file
+            let _ = self.storeImageDataToFile(data: self.imageToData(image: thumbImage!)!, path: thumbURL.path)
+        }
+    }
+    
+    func getThumbnailImage(url: URL) -> UIImage? {
+        let asset: AVURLAsset = AVURLAsset.init(url: url)
+        let gen: AVAssetImageGenerator = AVAssetImageGenerator.init(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        let time: CMTime = CMTimeMakeWithSeconds(0, preferredTimescale: 600)
+        do {
+            let image: CGImage = try gen.copyCGImage(at: time, actualTime: nil)
+            let thumb: UIImage = UIImage.init(cgImage: image)
+            return thumb
         } catch {
             return nil
         }

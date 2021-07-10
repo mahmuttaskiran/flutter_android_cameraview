@@ -1,4 +1,4 @@
-package com.mahmuttaskiran.cameraview.flutter_camera_view
+package com.lucky1213.flutter_camera_view
 
 import android.content.Context
 import io.flutter.plugin.common.JSONMessageCodec

@@ -1,4 +1,4 @@
-group 'com.mahmuttaskiran.cameraview.flutter_camera_view'
+group 'com.lucky1213.flutter_camera_view'
 version '1.0-SNAPSHOT'
 
 buildscript {

@@ -1,7 +1,6 @@
 name: flutter_camera_view
 description: A new flutter plugin project.
 version: 0.0.1
-author:
 homepage:
 
 environment:
@@ -27,7 +26,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.mahmuttaskiran.cameraview.flutter_camera_view
+        package: com.lucky1213.flutter_camera_view
         pluginClass: FlutterCameraViewPlugin
       ios:
         pluginClass: FlutterCameraViewPlugin

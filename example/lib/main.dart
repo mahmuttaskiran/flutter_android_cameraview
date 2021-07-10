@@ -94,11 +94,12 @@ class _CameraViewPageState extends State<CameraViewPage> {
             controller: controller,
           ),
           ValueListenableBuilder(
-            valueListenable: controller.initialized,
-            builder: (context, CameraState value, child) {
-              if (value == CameraState.ready) {
+            key: ValueKey(controller.value.state),
+            valueListenable: controller,
+            builder: (context, CameraValue value, child) {
+              if (value.state == CameraState.ready) {
                 return Container();
-              } else if (value == CameraState.preparing) {
+              } else if (value.state == CameraState.preparing) {
                 return Container(
                   color: Colors.black,
                 );
@@ -121,7 +122,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        if (null != path && !controller.isRecording)
+        if (null != path && !controller.value.isRecordingVideo)
           IconButton(
             icon: Icon(
               Icons.image,
@@ -153,7 +154,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
               }
             },
           ),
-        if (!controller.isRecording)
+        if (!controller.value.isRecordingVideo)
           IconButton(
             icon: Icon(
               Icons.switch_camera,
@@ -164,7 +165,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
               setState(() {});
             },
           ),
-        if (!controller.isRecording)
+        if (!controller.value.isRecordingVideo)
           FloatingActionButton(
             backgroundColor: Colors.green,
             child: Icon(Icons.camera),
@@ -183,9 +184,10 @@ class _CameraViewPageState extends State<CameraViewPage> {
           ),
         FloatingActionButton(
           backgroundColor: Colors.red,
-          child: Icon(controller.isRecording ? Icons.stop : Icons.videocam),
+          child: Icon(
+              controller.value.isRecordingVideo ? Icons.stop : Icons.videocam),
           onPressed: () async {
-            if (controller.isRecording) {
+            if (controller.value.isRecordingVideo) {
               await controller.stopRecording();
               print('videoRecordingEnd: $path');
             } else {
@@ -199,26 +201,27 @@ class _CameraViewPageState extends State<CameraViewPage> {
                   '${directory!.path}/videofile_${Random().nextInt(100000)}.mp4';
               final isRecording = await controller.startRecording(
                 File(path!),
-                maxDuration: Duration(seconds: 15),
+                storeThumbnail: true,
               );
               print("startRecordButton: isRecording: $isRecording");
             }
             setState(() {});
           },
         ),
-        if (!controller.isRecording && controller.facing == CameraFacing.back)
+        if (!controller.value.isRecordingVideo &&
+            controller.value.facing == CameraFacing.back)
           IconButton(
             icon: Icon(
-              controller.flash == CameraFlash.torch
+              controller.value.flash == CameraFlash.off
                   ? Icons.flash_off
                   : Icons.flash_on,
               color: Colors.white,
             ),
             onPressed: () async {
-              if (controller.flash == CameraFlash.torch) {
+              if (controller.value.flash == CameraFlash.on) {
                 controller.setFlash(CameraFlash.off);
               } else {
-                controller.setFlash(CameraFlash.torch);
+                controller.setFlash(CameraFlash.off);
               }
               setState(() {});
             },

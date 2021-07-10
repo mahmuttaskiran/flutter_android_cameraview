@@ -1,17 +1,16 @@
-package com.mahmuttaskiran.cameraview.flutter_camera_view
+package com.lucky1213.flutter_camera_view
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.otaliastudios.cameraview.*
 import com.otaliastudios.cameraview.controls.*
-import com.otaliastudios.cameraview.filter.Filter
-import com.otaliastudios.cameraview.filter.MultiFilter
-import com.otaliastudios.cameraview.filter.NoFilter
-import com.otaliastudios.cameraview.filters.*
 import com.otaliastudios.cameraview.gesture.Gesture
 import com.otaliastudios.cameraview.gesture.GestureAction
 import com.otaliastudios.cameraview.markers.DefaultAutoFocusMarker
@@ -23,9 +22,11 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import io.flutter.plugin.platform.PlatformView
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.File.separator
+import java.io.OutputStream
+
 
 var DEFAULT_VIDEO_MAX_DURATION = (60 * 1000) * 60
 
@@ -34,9 +35,13 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
     private var cameraView: CameraView
     private var channel: MethodChannel
     private var file: File? = null
+    private var storeThumbnail: Boolean = true
+    private var context: Context
+    private var thumbnailPath: String? = null
 
     init {
         Log.i("AndroidCameraView", "init!")
+        context = registrar.context()
         cameraView = initView(registrar, creationParams as JSONObject)
         channel = MethodChannel(registrar.messenger(), "flutter_camera_view_channel", JSONMethodCodec.INSTANCE)
         channel.setMethodCallHandler(this)
@@ -64,18 +69,54 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
         cameraView.mode = Mode.PICTURE
         cameraView.engine = Engine.CAMERA2
         cameraView.preview = Preview.GL_SURFACE
-        cameraView.audioBitRate = 64000;
+        cameraView.audioBitRate = 64000
+        cameraView.flash = Flash.OFF
         cameraView.setAutoFocusMarker(DefaultAutoFocusMarker())
         cameraView.mapGesture(Gesture.PINCH, GestureAction.ZOOM); // Pinch to zoom!
         cameraView.mapGesture(Gesture.TAP, GestureAction.AUTO_FOCUS); // Tap to focus!
         cameraView.mapGesture(Gesture.SCROLL_VERTICAL, GestureAction.EXPOSURE_CORRECTION); // scroll_vertical to exposure!
         // set size
-        var size: SizeSelector = SizeUtils.getSizeSelector(options.optString("resolutionPreset", "1080p"))
+        var size: SizeSelector =
+            SizeUtils.getSizeSelector(options.optString("resolutionPreset", "1080p"))
         cameraView.setPictureSize(size)
         cameraView.setVideoSize(size)
         cameraView.addCameraListener(this)
         cameraView.open()
         return cameraView
+    }
+
+    private fun storeThumbnailToFile(path: String) {
+        val media = MediaMetadataRetriever()
+        media.setDataSource(path)
+        var bitmap: Bitmap = media.frameAtTime
+
+        var outputDir = if (thumbnailPath != null) {
+            File(thumbnailPath!!)
+        } else {
+            File(File(path).parent, "thumbnail")
+        }
+        if (!outputDir.exists()) {
+            outputDir.mkdir()
+        }
+        var nomedia = File(outputDir.absolutePath + separator + ".nomedia")
+        if (!nomedia.exists()) {
+            nomedia.createNewFile()
+        }
+
+        var file = File(outputDir.absolutePath + separator + File(path).nameWithoutExtension + ".jpg")
+        if (file.exists()) {
+            file.delete()
+        }
+        try {
+            //outputStream获取文件的输出流对象
+            val fos: OutputStream = file.outputStream()
+            //压缩格式为JPEG图像，压缩质量为80%
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+            fos.flush()
+            fos.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onVideoRecordingStart() {
@@ -90,14 +131,13 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
     }
 
     override fun onVideoTaken(result: VideoResult) {
-        Log.i("AndroidCameraView", "onVideoTaken:")
+        Log.i("AndroidCameraView", "onVideoTaken:" + result.maxDuration)
         super.onVideoTaken(result)
-        val args = JSONObject()
-        args.put("height", result.size.height)
-        args.put("width", result.size.width)
-        args.put("fileSize", result.file.length())
-        args.put("file", result.file.absolutePath)
-        channel.invokeMethod("onVideoTaken", args)
+        MediaStoreUtils.insertIntoMediaStore(context, result.file, true)
+        if (storeThumbnail) {
+            storeThumbnailToFile(result.file.absolutePath)
+        }
+        channel.invokeMethod("onVideoTaken", null)
     }
 
     override fun onCameraError(exception: CameraException) {
@@ -162,13 +202,14 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
                 if (errorIfTakingVideo(result)) return
                 if (errorIfTakingPicture(result)) return
                 val fileInStr = jsonArgs.getString("file")
-                val maxDuration = jsonArgs.optInt("maxDuration", DEFAULT_VIDEO_MAX_DURATION)
+                thumbnailPath = jsonArgs.optString("thumbnailPath")
+                storeThumbnail = jsonArgs.optBoolean("storeThumbnail", true)
                 val file = File(fileInStr)
                 if (file.exists()) {
                     result.error("CameraError", "${file.path} already exists.", null)
                     return
                 }
-                cameraView.takeVideoSnapshot(file, maxDuration)
+                cameraView.takeVideoSnapshot(file)
                 return result.success(true)
             }
             "takePicture" -> {
@@ -187,7 +228,9 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
                 cameraView.addCameraListener(object : CameraListener() {
                     override fun onPictureTaken(picture: PictureResult) {
                         super.onPictureTaken(picture)
+
                         CameraUtils.writeToFile(picture.data, file!!)
+                        MediaStoreUtils.insertIntoMediaStore(context, file!!)
                         result.success(true)
                         cameraView.removeCameraListener(this)
                     }
@@ -208,7 +251,7 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
             "stopRecording" -> {
                 if (errorIfCameraNotOpened(result)) return
                 cameraView.stopVideo()
-                return result.success(true)
+                result.success(true)
             }
             "isPermissionsGranted" -> {
                 result.success(ContextCompat.checkSelfPermission(registrar.context(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(registrar.context(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
