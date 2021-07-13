@@ -159,7 +159,7 @@ class FlutterCameraController extends ValueNotifier<CameraValue> {
       var result = await _invokeMethod('startRecording', {
         'file': file.path,
         'storeThumbnail': storeThumbnail,
-        'thumbnailPath': thumbnailFile,
+        'thumbnailPath': thumbnailFile?.path,
       });
       if (result == true) {
         value = value.copyWith(
