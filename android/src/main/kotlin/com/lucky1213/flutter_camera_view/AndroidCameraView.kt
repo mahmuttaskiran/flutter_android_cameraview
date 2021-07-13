@@ -38,6 +38,7 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
     private var storeThumbnail: Boolean = true
     private var context: Context
     private var thumbnailPath: String? = null
+    private var mediaMetadataRetriever: MediaMetadataRetriever? = null
 
     init {
         Log.i("AndroidCameraView", "init!")
@@ -85,38 +86,52 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
         return cameraView
     }
 
-    private fun storeThumbnailToFile(path: String) {
-        val media = MediaMetadataRetriever()
-        media.setDataSource(path)
-        var bitmap: Bitmap = media.frameAtTime
+    private fun storeThumbnailToFile(path: String, quality: Int = 100) : String? {
+        mediaMetadataRetriever = mediaMetadataRetriever ?: MediaMetadataRetriever()
+        mediaMetadataRetriever!!.setDataSource(path)
+        val bitmap: Bitmap? = mediaMetadataRetriever!!.frameAtTime
 
-        var outputDir = if (thumbnailPath != null) {
-            File(thumbnailPath!!)
+        val outputDir = if (thumbnailPath != null) {
+            File(thumbnailPath).parentFile
         } else {
-            File(File(path).parent, "thumbnail")
+            File(path).parentFile!!
         }
         if (!outputDir.exists()) {
             outputDir.mkdir()
         }
-        var nomedia = File(outputDir.absolutePath + separator + ".nomedia")
-        if (!nomedia.exists()) {
-            nomedia.createNewFile()
-        }
+        MediaStoreUtils.ignoreMedia(outputDir)
 
-        var file = File(outputDir.absolutePath + separator + File(path).nameWithoutExtension + ".jpg")
+        var format = Bitmap.CompressFormat.JPEG
+        val file = if (thumbnailPath != null) {
+            File(thumbnailPath)
+        } else {
+            File(outputDir, File(path).nameWithoutExtension + "_thumbnail.jpg")
+        }
         if (file.exists()) {
             file.delete()
         }
+        if (thumbnailPath != null) {
+            val extension = MediaStoreUtils.getFileExtensionFromUrl(thumbnailPath!!)
+            format = if (extension == "jpg" || extension == "jpeg") {
+                Bitmap.CompressFormat.JPEG
+            } else if (extension == "png") {
+                Bitmap.CompressFormat.PNG
+            } else {
+                Bitmap.CompressFormat.JPEG
+            }
+        }
+
         try {
             //outputStream获取文件的输出流对象
             val fos: OutputStream = file.outputStream()
-            //压缩格式为JPEG图像，压缩质量为80%
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+            //压缩格式为JPEG图像，压缩质量为100%
+            bitmap!!.compress(format, quality, fos)
             fos.flush()
             fos.close()
         } catch (e: Exception) {
-            e.printStackTrace()
+            throw RuntimeException(e)
         }
+        return file.absolutePath
     }
 
     override fun onVideoRecordingStart() {
@@ -133,7 +148,7 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
     override fun onVideoTaken(result: VideoResult) {
         Log.i("AndroidCameraView", "onVideoTaken:" + result.maxDuration)
         super.onVideoTaken(result)
-        MediaStoreUtils.insertIntoMediaStore(context, result.file, true)
+        MediaStoreUtils.insertIntoMediaStore(context, result.file)
         if (storeThumbnail) {
             storeThumbnailToFile(result.file.absolutePath)
         }

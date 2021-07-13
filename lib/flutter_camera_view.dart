@@ -147,6 +147,9 @@ class FlutterCameraController extends ValueNotifier<CameraValue> {
     }
   }
 
+  /// 录制视频
+  /// * [storeThumbnail] 是否保存缩略图
+  /// * [thumbnailPath] 保存缩略图的路径
   Future<bool> startRecording(
     File file, {
     bool storeThumbnail = true,

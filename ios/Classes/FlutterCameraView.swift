@@ -247,18 +247,19 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     func storeThumbnailToFile(url: URL) -> Void {
         // .mp4 -> .jpg
         let manager = FileManager.default
-        let filename: String = fileURL!.deletingPathExtension().lastPathComponent
         var thumbURL: URL
         if (thumbnailPath != nil) {
-            thumbURL = URL(fileURLWithPath: thumbnailPath! + "/", isDirectory: true)
+            thumbURL = URL(fileURLWithPath: thumbnailPath!)
         } else {
-            thumbURL = fileURL!.deletingLastPathComponent().appendingPathComponent("thumbnail", isDirectory: true)
+            thumbURL = fileURL!.deletingLastPathComponent()
         }
         if (!manager.fileExists(atPath: thumbURL.path)) {
             try! manager.createDirectory(atPath: thumbURL.path, withIntermediateDirectories: true, attributes: nil)
         }
-        
-        thumbURL.appendPathComponent(filename + ".jpg")
+        if (thumbnailPath == nil) {
+            let filename: String = fileURL!.deletingPathExtension().lastPathComponent
+            thumbURL.appendPathComponent(filename + "_thumbnail.jpg")
+        }
         // get thumb UIImage
         let thumbImage = self.getThumbnailImage(url: url)
         if (thumbImage != nil) {
