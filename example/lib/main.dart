@@ -201,7 +201,6 @@ class _CameraViewPageState extends State<CameraViewPage> {
                   '${directory!.path}/videofile_${Random().nextInt(100000)}.mp4';
               final isRecording = await controller.startRecording(
                 File(path!),
-                storeThumbnail: true,
               );
               print("startRecordButton: isRecording: $isRecording");
             }

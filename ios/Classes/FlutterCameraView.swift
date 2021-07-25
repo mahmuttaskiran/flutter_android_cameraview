@@ -13,12 +13,12 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     
     private var cameraView: UIView
     private let cameraManager: CameraManager
-    private var fileURL: URL?
     private var isTakingVideo: Bool = false
     private var isTakingPicture: Bool = false
     private var channel: FlutterMethodChannel?
     private var thumbnailPath: String?
     private var storeThumbnail: Bool = true
+    private var thumbnailQuality: CGFloat = 1
 
     init(
         frame: CGRect,
@@ -129,12 +129,14 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                 return
             }
             let file: String = dict!.value(forKey: "file") as! String
+            let saveToLibrary: Bool = dict!.value(forKey: "saveToLibrary") as? Bool ?? false
+            cameraManager.writeFilesToPhoneLibrary = saveToLibrary
             isTakingPicture = true
             cameraManager.capturePictureWithCompletion({ image in
                 switch image {
                     case .failure:
                         self.isTakingPicture = false
-                        result(FlutterError.init(code: "TakePictureError", message: "Take picture failure.", details: nil))
+                        result(FlutterError(code: "TakePictureError", message: "Take picture failure.", details: nil))
                     case .success:
                         self.isTakingPicture = false
                         result(true)
@@ -152,11 +154,14 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                 return
             }
             let file: String = dict!.value(forKey: "file") as! String
-            thumbnailPath = dict!.value(forKey: "thumbnailPath") as? String
+            let saveToLibrary: Bool = dict!.value(forKey: "saveToLibrary") as? Bool ?? false
+            cameraManager.writeFilesToPhoneLibrary = saveToLibrary
             storeThumbnail = dict!.value(forKey: "storeThumbnail") as! Bool
-            fileURL = URL(fileURLWithPath: file)
+            thumbnailPath = dict!.value(forKey: "thumbnailPath") as? String
+            thumbnailQuality = CGFloat(dict!.value(forKey: "thumbnailQuality") as! Int ) / 100
+            
             self.isTakingVideo = true
-            cameraManager.startRecordingVideo(fileURL!)
+            cameraManager.startRecordingVideo(URL(fileURLWithPath: file))
             result(true)
             onVideoRecordingStart()
         case "stopRecording":
@@ -167,15 +172,15 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
                 guard let videoURL = videoURL else {
                     self.isTakingVideo = false
                     //Handle error of no recorded video URL
-                    result(FlutterError.init(code: "RecordedError", message: recordError?.description ?? "No recorded.", details: nil))
+                    result(FlutterError(code: "RecordedError", message: recordError?.description ?? "No recorded.", details: nil))
                     return;
+                }
+                if (self.storeThumbnail) {
+                    let _ = self.storeThumbnailToFile(url: videoURL, thumbnailPath: self.thumbnailPath, quality: self.thumbnailQuality)
                 }
                 self.onVideoRecordingEnd()
                 self.isTakingVideo = false
                 result(true)
-                if (self.storeThumbnail) {
-                    self.storeThumbnailToFile(url: videoURL)
-                }
                 self.onVideoTaken()
             })
         default:
@@ -205,7 +210,7 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     
     func errorIfCameraNotOpened(result: FlutterResult) -> Bool {
         if (!cameraManager.cameraIsReady) {
-            result(FlutterError.init(code: "CameraError", message: "Camera is not opened.", details: nil))
+            result(FlutterError(code: "CameraError", message: "Camera is not opened.", details: nil))
             return true
         }
         return false
@@ -213,7 +218,7 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     
     func errorIfTakingPicture(result: FlutterResult) -> Bool {
         if (isTakingPicture) {
-            result(FlutterError.init(code: "CameraError", message: "Already is taking picture.", details: nil))
+            result(FlutterError(code: "CameraError", message: "Already is taking picture.", details: nil))
             return true
         }
         return false
@@ -221,51 +226,43 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
     
     func errorIfTakingVideo(result: FlutterResult) -> Bool {
         if (isTakingVideo) {
-            result(FlutterError.init(code: "CameraError", message: "Already is recording video.", details: nil))
+            result(FlutterError(code: "CameraError", message: "Already is recording video.", details: nil))
             return true
         }
         return false
     }
     
-    func imageToData(image: UIImage) -> Data? {
-        guard let data = image.jpegData(compressionQuality: 1.0) else {
-            return nil
-        }
-        return data
-    }
-    
-    func storeImageDataToFile(data: Data, path: String) -> String? {
-        let fileURL = URL(fileURLWithPath: path)
-        do {
-            try data.write(to: fileURL)
-            return path
-        } catch {
-            return nil
-        }
-    }
-    
-    func storeThumbnailToFile(url: URL) -> Void {
-        // .mp4 -> .jpg
+    private func createDirectory(_ url: URL) -> Void {
         let manager = FileManager.default
+        if (!manager.fileExists(atPath: url.path)) {
+            try! manager.createDirectory(atPath: url.path, withIntermediateDirectories: true, attributes: nil)
+        }
+    }
+    
+    func storeThumbnailToFile(url: URL, thumbnailPath: String? = nil, quality: CGFloat = 1.0) -> String? {
+        // .mp4 -> .jpg
         var thumbURL: URL
         if (thumbnailPath != nil) {
-            thumbURL = URL(fileURLWithPath: thumbnailPath!)
+            thumbURL = URL(fileURLWithPath: thumbnailPath!).deletingLastPathComponent()
         } else {
-            thumbURL = fileURL!.deletingLastPathComponent()
+            thumbURL = url.deletingLastPathComponent()
         }
-        if (!manager.fileExists(atPath: thumbURL.path)) {
-            try! manager.createDirectory(atPath: thumbURL.path, withIntermediateDirectories: true, attributes: nil)
-        }
+        createDirectory(thumbURL)
         if (thumbnailPath == nil) {
-            let filename: String = fileURL!.deletingPathExtension().lastPathComponent
+            let filename: String = url.deletingPathExtension().lastPathComponent
             thumbURL.appendPathComponent(filename + "_thumbnail.jpg")
+        } else {
+            thumbURL = URL(fileURLWithPath: thumbnailPath!)
         }
         // get thumb UIImage
         let thumbImage = self.getThumbnailImage(url: url)
         if (thumbImage != nil) {
             // store to file
-            let _ = self.storeImageDataToFile(data: self.imageToData(image: thumbImage!)!, path: thumbURL.path)
+            if let _ = thumbImage!.storeImageToFile(thumbURL.path, quality: quality) {
+                return thumbURL.path
+            }
         }
+        return nil
     }
     
     func getThumbnailImage(url: URL) -> UIImage? {

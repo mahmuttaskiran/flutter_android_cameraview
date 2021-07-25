@@ -61,6 +61,12 @@ extension ExtensionResolutionPreset on ResolutionPreset {
 
 enum CameraState { preparing, ready, error }
 
+class ThumbnailConfig {
+  final int quality;
+  final File? file;
+  const ThumbnailConfig({this.quality = 100, this.file});
+}
+
 class CameraValue {
   final bool isTakingPicture;
   final bool isRecordingVideo;
@@ -152,14 +158,16 @@ class FlutterCameraController extends ValueNotifier<CameraValue> {
   /// * [thumbnailFile] 保存缩略图的路径
   Future<bool> startRecording(
     File file, {
-    bool storeThumbnail = true,
-    File? thumbnailFile,
+    ThumbnailConfig? thumbnailConfig = const ThumbnailConfig(),
+    bool saveToLibrary = false,
   }) async {
     try {
       var result = await _invokeMethod('startRecording', {
         'file': file.path,
-        'storeThumbnail': storeThumbnail,
-        'thumbnailPath': thumbnailFile?.path,
+        'saveToLibrary': saveToLibrary,
+        'storeThumbnail': thumbnailConfig != null,
+        'thumbnailPath': thumbnailConfig?.file?.path,
+        'thumbnailQuality': thumbnailConfig?.quality ?? 100,
       });
       if (result == true) {
         value = value.copyWith(
@@ -177,13 +185,17 @@ class FlutterCameraController extends ValueNotifier<CameraValue> {
     return Future.value(false);
   }
 
-  Future<bool> takePicture(File file) async {
+  Future<bool> takePicture(
+    File file, {
+    bool saveToLibrary = false,
+  }) async {
     value = value.copyWith(
       isTakingPicture: true,
     );
     try {
       var result = await _invokeMethod('takePicture', {
         'file': file.path,
+        'saveToLibrary': saveToLibrary,
       });
       if (result == true) {
         value = value.copyWith(
