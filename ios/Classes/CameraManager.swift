@@ -1259,6 +1259,9 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
                     if port.mediaType == AVMediaType.video {
                         let videoConnection = connection as AVCaptureConnection
                         // setup video mirroring
+                        if videoConnection.isVideoOrientationSupported {
+                            videoConnection.videoOrientation = self._currentCaptureVideoOrientation()
+                        }
                         if videoConnection.isVideoMirroringSupported {
                             videoConnection.isVideoMirrored = (cameraDevice == CameraDevice.front && shouldFlipFrontCameraImage)
                         }
