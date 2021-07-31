@@ -736,27 +736,27 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
         
         _setupVideoConnection()
         
-//        if shouldUseLocationServices {
-//
-//            let specs = [kCMMetadataFormatDescriptionMetadataSpecificationKey_Identifier as String: AVMetadataIdentifier.quickTimeMetadataLocationISO6709,
-//                         kCMMetadataFormatDescriptionMetadataSpecificationKey_DataType as String: kCMMetadataDataType_QuickTimeMetadataLocation_ISO6709 as String] as [String: Any]
-//
-//            var locationMetadataDesc: CMFormatDescription?
-//            CMMetadataFormatDescriptionCreateWithMetadataSpecifications(allocator: kCFAllocatorDefault, metadataType: kCMMetadataFormatType_Boxed, metadataSpecifications: [specs] as CFArray, formatDescriptionOut: &locationMetadataDesc)
-//
-//            // Create the metadata input and add it to the session.
-//            guard let captureSession = captureSession, let locationMetadata = locationMetadataDesc else {
-//                return
-//            }
-//
-//            let newLocationMetadataInput = AVCaptureMetadataInput(formatDescription: locationMetadata, clock: CMClockGetHostTimeClock())
-//            captureSession.addInputWithNoConnections(newLocationMetadataInput)
-//
-//            // Connect the location metadata input to the movie file output.
-//            let inputPort = newLocationMetadataInput.ports[0]
-//            captureSession.addConnection(AVCaptureConnection(inputPorts: [inputPort], output: videoOutput))
-//
-//        }
+        if shouldUseLocationServices {
+
+            let specs = [kCMMetadataFormatDescriptionMetadataSpecificationKey_Identifier as String: AVMetadataIdentifier.quickTimeMetadataLocationISO6709,
+                         kCMMetadataFormatDescriptionMetadataSpecificationKey_DataType as String: kCMMetadataDataType_QuickTimeMetadataLocation_ISO6709 as String] as [String: Any]
+
+            var locationMetadataDesc: CMFormatDescription?
+            CMMetadataFormatDescriptionCreateWithMetadataSpecifications(allocator: kCFAllocatorDefault, metadataType: kCMMetadataFormatType_Boxed, metadataSpecifications: [specs] as CFArray, formatDescriptionOut: &locationMetadataDesc)
+
+            // Create the metadata input and add it to the session.
+            guard let captureSession = captureSession, let locationMetadata = locationMetadataDesc else {
+                return
+            }
+
+            let newLocationMetadataInput = AVCaptureMetadataInput(formatDescription: locationMetadata, clock: CMClockGetHostTimeClock())
+            captureSession.addInputWithNoConnections(newLocationMetadataInput)
+
+            // Connect the location metadata input to the movie file output.
+            let inputPort = newLocationMetadataInput.ports[0]
+            captureSession.addConnection(AVCaptureConnection(inputPorts: [inputPort], output: videoOutput))
+
+        }
 
         _updateIlluminationMode(flashMode)
         let url = filePath ?? _tempFilePath()
@@ -1240,7 +1240,7 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
         
         let newMovieOutput = AVCaptureMovieFileOutput()
         newMovieOutput.movieFragmentInterval = CMTime.invalid
-
+        
         movieOutput = newMovieOutput
         
         _setupVideoConnection()
@@ -1259,11 +1259,11 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
                     if port.mediaType == AVMediaType.video {
                         let videoConnection = connection as AVCaptureConnection
                         // setup video mirroring
-                        if videoConnection.isVideoOrientationSupported {
-                            videoConnection.videoOrientation = self._currentCaptureVideoOrientation()
-                        }
                         if videoConnection.isVideoMirroringSupported {
                             videoConnection.isVideoMirrored = (cameraDevice == CameraDevice.front && shouldFlipFrontCameraImage)
+                        }
+                        if videoConnection.isVideoOrientationSupported {
+                            videoConnection.videoOrientation = self._currentCaptureVideoOrientation()
                         }
 
                         if videoConnection.isVideoStabilizationSupported {
@@ -1800,12 +1800,14 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
             switch cameraDevice {
                 case .front:
                     if hasFrontCamera {
+                        frontCameraDevice?.set(frameRate: 30)
                         if let validFrontDevice = _deviceInputFromDevice(frontCameraDevice),
                             !inputs.contains(validFrontDevice) {
                             validCaptureSession.addInput(validFrontDevice)
                         }
                 }
                 case .back:
+                    backCameraDevice?.set(frameRate: 30)
                     if let validBackDevice = _deviceInputFromDevice(backCameraDevice),
                         !inputs.contains(validBackDevice) {
                         validCaptureSession.addInput(validBackDevice)
@@ -1969,4 +1971,23 @@ extension CameraManager: AVCaptureMetadataOutputObjectsDelegate {
         
         handler(.success(stringValue))
     }
+}
+
+extension AVCaptureDevice {
+    func set(frameRate: Double) {
+    guard let range = activeFormat.videoSupportedFrameRateRanges.first,
+        range.minFrameRate...range.maxFrameRate ~= frameRate
+        else {
+            print("Requested FPS is not supported by the device's activeFormat !")
+            return
+    }
+
+    do { try lockForConfiguration()
+        activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
+        activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
+        unlockForConfiguration()
+    } catch {
+        print("LockForConfiguration failed with error: \(error.localizedDescription)")
+    }
+  }
 }
