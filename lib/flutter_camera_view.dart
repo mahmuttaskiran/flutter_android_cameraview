@@ -38,7 +38,7 @@ extension ExtensionResolutionPreset on ResolutionPreset {
     String string;
     switch (this) {
       case ResolutionPreset.UHD:
-        string = '1260p';
+        string = '2160p';
         break;
       case ResolutionPreset.FHD:
         string = '1080p';
@@ -128,7 +128,7 @@ class FlutterCameraController extends ValueNotifier<CameraValue> {
 
   FlutterCameraController({
     CameraFacing facing = CameraFacing.back,
-    ResolutionPreset resolutionPreset = ResolutionPreset.FHD,
+    ResolutionPreset resolutionPreset = ResolutionPreset.QHD,
     required this.onCameraError,
   }) : super(CameraValue(facing: facing, resolutionPreset: resolutionPreset)) {
     _channel.setMethodCallHandler(_methodCallHandler);

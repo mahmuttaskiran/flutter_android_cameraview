@@ -33,7 +33,6 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         if(args is NSDictionary){
             let dict = args as! NSDictionary
             cameraManager.cameraDevice = dict.value(forKey: "facing") as! String == "FRONT" ? .front : .back
-            cameraManager.cameraOutputQuality = getPresetForString(size: dict.value(forKey: "resolutionPreset") as! String)
         }
         // iOS views can be created here
         cameraManager.shouldFlipFrontCameraImage = true
@@ -45,6 +44,8 @@ class FlutterCameraView: NSObject, FlutterPlatformView {
         
         let state = cameraManager.addPreviewLayerToView(cameraView)
         if (state == CameraState.ready) {
+            let dict = args as! NSDictionary
+            cameraManager.cameraOutputQuality = getPresetForString(size: dict.value(forKey: "resolutionPreset") as! String)
             onCameraOpened()
         }
         

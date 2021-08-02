@@ -67,7 +67,7 @@ class CameraViewPage extends StatefulWidget {
 class _CameraViewPageState extends State<CameraViewPage> {
   final FlutterCameraController controller = FlutterCameraController(
     facing: CameraFacing.back,
-    resolutionPreset: ResolutionPreset.UHD,
+    resolutionPreset: ResolutionPreset.QHD,
     onCameraError: (e, st) {},
   );
   String? path;
@@ -178,7 +178,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
               }
               path =
                   '${directory!.path}/imagefile_${Random().nextInt(100000)}.jpg';
-              await controller.takePicture(File(path!));
+              await controller.takePicture(File(path!), saveToLibrary: true);
               setState(() {});
             },
           ),
@@ -201,6 +201,7 @@ class _CameraViewPageState extends State<CameraViewPage> {
                   '${directory!.path}/videofile_${Random().nextInt(100000)}.mp4';
               final isRecording = await controller.startRecording(
                 File(path!),
+                saveToLibrary: true,
               );
               print("startRecordButton: isRecording: $isRecording");
             }
