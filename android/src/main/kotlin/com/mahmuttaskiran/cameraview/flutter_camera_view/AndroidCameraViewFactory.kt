@@ -7,10 +7,8 @@ import io.flutter.plugin.platform.PlatformViewFactory
 
 import io.flutter.plugin.common.PluginRegistry.Registrar
 
-class AndroidCameraViewFactory(private val mPluginRegistrar: Registrar) : PlatformViewFactory(JSONMessageCodec.INSTANCE) {
-
+class AndroidCameraViewFactory() : PlatformViewFactory(JSONMessageCodec.INSTANCE) {
   override fun create(context: Context, i: Int, o: Any): PlatformView {
-    return AndroidCameraView(mPluginRegistrar, o)
+    return AndroidCameraView(o)
   }
-
 }

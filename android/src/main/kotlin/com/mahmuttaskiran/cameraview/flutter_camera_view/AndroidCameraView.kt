@@ -27,24 +27,21 @@ import java.io.File
 var DEFAULT_VIDEO_MAX_DURATION = (60 * 1000) * 60
 
 class AndroidCameraView
-internal constructor(private val registrar: Registrar, creationParams: Any) : PlatformView, MethodCallHandler, CameraListener() {
+internal constructor(creationParams: Any) : PlatformView, MethodCallHandler, CameraListener() {
     private var cameraView: CameraView
     private var channel: MethodChannel
 
     init {
-        Log.i("AndroidCameraView", "init!")
         cameraView = initView(registrar, creationParams as JSONObject)
         channel = MethodChannel(registrar.messenger(), "android_camera_view_channel", JSONMethodCodec.INSTANCE)
         channel.setMethodCallHandler(this)
     }
 
     override fun getView(): View {
-        Log.i("AndroidCameraView", "getView")
         return cameraView
     }
 
     override fun dispose() {
-        Log.i("AndroidCameraView", "destroy")
         if (cameraView.isOpened) {
             cameraView.removeCameraListener(this)
             cameraView.close()
@@ -54,7 +51,6 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
 
     @SuppressLint("DefaultLocale")
     private fun initView(registrar: Registrar, options: JSONObject): CameraView {
-        Log.i("AndroidCameraView", "initView: $options")
         val cameraView = CameraView(registrar.context())
         cameraView.facing = Facing.valueOf(options.optString("facing", "FRONT").toUpperCase())
         cameraView.mode = Mode.VIDEO
@@ -66,18 +62,15 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
     }
 
     override fun onVideoRecordingStart() {
-        Log.i("AndroidCameraView", "onVideoRecordingStart:")
         super.onVideoRecordingStart()
         channel.invokeMethod("onVideoRecordingStart", null)
     }
 
     override fun onVideoRecordingEnd() {
-        Log.i("AndroidCameraView", "onVideoRecordingEnd:")
         channel.invokeMethod("onVideoRecordingEnd", null)
     }
 
     override fun onVideoTaken(result: VideoResult) {
-        Log.i("AndroidCameraView", "onVideoTaken:")
         super.onVideoTaken(result)
         val args = JSONObject()
         args.put("height", result.size.height)
@@ -89,7 +82,6 @@ internal constructor(private val registrar: Registrar, creationParams: Any) : Pl
 
     override fun onCameraError(exception: CameraException) {
         exception.printStackTrace()
-        Log.i("AndroidCameraView", "onCameraError:")
         super.onCameraError(exception)
         val args = JSONObject()
         args.put("message", exception.message)
