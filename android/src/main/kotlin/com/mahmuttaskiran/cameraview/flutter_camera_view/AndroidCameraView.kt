@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
+import android.content.Context
 import com.otaliastudios.cameraview.*
 import com.otaliastudios.cameraview.controls.*
 import com.otaliastudios.cameraview.filter.Filter
@@ -27,13 +28,13 @@ import java.io.File
 var DEFAULT_VIDEO_MAX_DURATION = (60 * 1000) * 60
 
 class AndroidCameraView
-internal constructor(creationParams: Any) : PlatformView, MethodCallHandler, CameraListener() {
+internal constructor(context: Context, methodChannel: MethodChannel, creationParams: Any) : PlatformView, MethodCallHandler, CameraListener() {
     private var cameraView: CameraView
     private var channel: MethodChannel
 
     init {
-        cameraView = initView(registrar, creationParams as JSONObject)
-        channel = MethodChannel(registrar.messenger(), "android_camera_view_channel", JSONMethodCodec.INSTANCE)
+        cameraView = initView(context, creationParams as JSONObject)
+        channel = methodChannel
         channel.setMethodCallHandler(this)
     }
 
@@ -50,8 +51,8 @@ internal constructor(creationParams: Any) : PlatformView, MethodCallHandler, Cam
     }
 
     @SuppressLint("DefaultLocale")
-    private fun initView(registrar: Registrar, options: JSONObject): CameraView {
-        val cameraView = CameraView(registrar.context())
+    private fun initView(context: Context, options: JSONObject): CameraView {
+        val cameraView = CameraView(context)
         cameraView.facing = Facing.valueOf(options.optString("facing", "FRONT").toUpperCase())
         cameraView.mode = Mode.VIDEO
         cameraView.engine = Engine.CAMERA2
